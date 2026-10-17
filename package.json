@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "migrate:data": "node --env-file=.env.local scripts/migrate-farm-data.mjs",
     "lint": "eslint"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",
     "react": "19.3.0",

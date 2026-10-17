@@ -13,6 +13,8 @@ import {
   LayoutDashboard,
   Leaf,
   LoaderCircle,
+  LockKeyhole,
+  LogOut,
   Map,
   Pencil,
   Plus,
@@ -114,6 +116,12 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [editing, setEditing] = useState<EditingRecord | null>(null);
+  const [ownerAuthenticated, setOwnerAuthenticated] = useState(false);
+  const [ownerConfigured, setOwnerConfigured] = useState(false);
+  const [ownerLoginOpen, setOwnerLoginOpen] = useState(false);
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerAuthError, setOwnerAuthError] = useState('');
+  const [ownerSubmitting, setOwnerSubmitting] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantInput, setAssistantInput] = useState('');
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([]);
@@ -142,6 +150,53 @@ export default function Home() {
       )
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((response) => response.json())
+      .then(
+        (result: {
+          authenticated: boolean;
+          configured: boolean;
+          developmentAccess: boolean;
+        }) => {
+          setOwnerAuthenticated(result.authenticated || result.developmentAccess);
+          setOwnerConfigured(result.configured);
+        },
+      )
+      .catch(() => setOwnerConfigured(false));
+  }, []);
+
+  const canManageFarm = ownerAuthenticated;
+
+  async function loginOwner(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOwnerSubmitting(true);
+    setOwnerAuthError('');
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: ownerPassword }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? 'Inloggen is mislukt.');
+      setOwnerAuthenticated(true);
+      setOwnerLoginOpen(false);
+      setOwnerPassword('');
+    } catch (loginError) {
+      setOwnerAuthError(
+        loginError instanceof Error ? loginError.message : 'Inloggen is mislukt.',
+      );
+    } finally {
+      setOwnerSubmitting(false);
+    }
+  }
+
+  async function logoutOwner() {
+    await fetch('/api/auth', { method: 'DELETE' });
+    setOwnerAuthenticated(false);
+  }
 
   useEffect(() => {
     if (assistantOpen) {
@@ -605,6 +660,37 @@ export default function Home() {
                 </div>
               )}
             </div>
+            {ownerConfigured ? (
+              ownerAuthenticated ? (
+                <button
+                  type="button"
+                  className="owner-access-button"
+                  aria-label="Log uit als eigenaar"
+                  onClick={logoutOwner}
+                >
+                  <LogOut size={15} />
+                  <span>Owner</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="owner-access-button"
+                  onClick={() => {
+                    setOwnerAuthError('');
+                    setOwnerLoginOpen(true);
+                  }}
+                >
+                  <LockKeyhole size={15} />
+                  <span>Owner login</span>
+                </button>
+              )
+            ) : (
+              <span className="owner-state">
+                {process.env.NODE_ENV === 'production'
+                  ? 'Read only'
+                  : 'Local editing'}
+              </span>
+            )}
             <span className="topbar-divider" />
             <span className="today-label">
               {new Intl.DateTimeFormat('en', {
@@ -646,7 +732,7 @@ export default function Home() {
                 next.
               </p>
             </div>
-            <div className="heading-actions">
+            {canManageFarm && <div className="heading-actions">
               <button
                 className="button button-secondary"
                 onClick={() => setModal('plot')}
@@ -663,7 +749,7 @@ export default function Home() {
               >
                 <Sprout size={16} /> Plan planting
               </button>
-            </div>
+            </div>}
           </section>
 
           {notice && (
@@ -743,7 +829,7 @@ export default function Home() {
                         : 'Schedule a planting to begin your next crop cycle.'}
                   </small>
                 </div>
-                <button
+                {canManageFarm && <button
                   className="banner-action"
                   onClick={() =>
                     setModal(readyPlantings.length ? 'harvest' : 'planting')
@@ -753,7 +839,7 @@ export default function Home() {
                     {readyPlantings.length ? 'Log a harvest' : 'Plan a crop'}
                   </span>
                   <ArrowUpRight size={16} />
-                </button>
+                </button>}
                 <div className="banner-grain" aria-hidden="true">
                   <span />
                   <span />
@@ -785,12 +871,12 @@ export default function Home() {
                   <FieldMap
                     plots={farm.plots}
                     plantings={farm.plantings}
-                    onSelectPlot={(plotId) => {
+                    onSelectPlot={canManageFarm ? (plotId) => {
                       if (occupiedPlotIds.has(plotId)) return;
                       setSelectedPlotId(plotId);
                       setModal('planting');
                       setNotice('');
-                    }}
+                    } : undefined}
                   />
                   <div className="map-legend">
                     <span>
@@ -865,6 +951,7 @@ export default function Home() {
                   plots={farm.plots}
                   onEdit={(record) => editRecord('harvest', record)}
                   onDelete={(id) => deleteRecord('harvest', id)}
+                  canManage={canManageFarm}
                 />
               </section>
             </>
@@ -877,12 +964,12 @@ export default function Home() {
                   <div className="section-kicker">LAND & ASSIGNMENTS</div>
                   <h2>All plots</h2>
                 </div>
-                <button
+                {canManageFarm && <button
                   className="button button-secondary"
                   onClick={() => setModal('plot')}
                 >
                   <Plus size={16} /> Add a plot
-                </button>
+                </button>}
               </div>
               <FieldMap
                 plots={farm.plots}
@@ -907,7 +994,7 @@ export default function Home() {
                   <span>Area</span>
                   <span>Assignment</span>
                   <span>Status</span>
-                  <span>Actions</span>
+                  {canManageFarm && <span>Actions</span>}
                 </div>
                 {filteredPlots.map((plot) => {
                   const crop = farm.plantings.find(
@@ -929,7 +1016,7 @@ export default function Home() {
                           tone={crop ? 'green' : 'neutral'}
                         />
                       </span>
-                      <RecordActions
+                      {canManageFarm && <RecordActions
                         label={plot.name}
                         onEdit={() => editRecord('plot', plot)}
                         onDelete={() => deleteRecord('plot', plot.id)}
@@ -937,7 +1024,7 @@ export default function Home() {
                           (planting) => planting.plotId === plot.id,
                         )}
                         deleteReason="This plot has planting history."
-                      />
+                      />}
                     </div>
                   );
                 })}
@@ -955,7 +1042,7 @@ export default function Home() {
                   <div className="section-kicker">CROP CYCLE</div>
                   <h2>Planting schedule</h2>
                 </div>
-                <button
+                {canManageFarm && <button
                   className="button button-primary"
                   onClick={() => {
                     setSelectedPlotId(null);
@@ -964,7 +1051,7 @@ export default function Home() {
                   disabled={freePlots.length === 0}
                 >
                   <Plus size={16} /> Schedule planting
-                </button>
+                </button>}
               </div>
               <div className="planting-table">
                 <div className="table-head planting-columns">
@@ -973,7 +1060,7 @@ export default function Home() {
                   <span>Planted</span>
                   <span>Expected harvest</span>
                   <span>Status</span>
-                  <span>Actions</span>
+                  {canManageFarm && <span>Actions</span>}
                 </div>
                 {filteredPlantings.map((planting) => {
                   const status = getPlantingStatus(planting);
@@ -1012,7 +1099,7 @@ export default function Home() {
                           }
                         />
                       </span>
-                      <RecordActions
+                      {canManageFarm && <RecordActions
                         label={`${planting.crop} planting`}
                         onEdit={() => editRecord('planting', planting)}
                         onDelete={() => deleteRecord('planting', planting.id)}
@@ -1020,7 +1107,7 @@ export default function Home() {
                           (harvest) => harvest.plantingId === planting.id,
                         )}
                         deleteReason="This planting has harvest history."
-                      />
+                      />}
                     </div>
                   );
                 })}
@@ -1038,13 +1125,13 @@ export default function Home() {
                   <div className="section-kicker">YIELD RECORD</div>
                   <h2>Harvest log</h2>
                 </div>
-                <button
+                {canManageFarm && <button
                   className="button button-primary"
                   onClick={() => setModal('harvest')}
                   disabled={currentPlantings.length === 0}
                 >
                   <Plus size={16} /> Log a harvest
-                </button>
+                </button>}
               </div>
               <div className="harvest-summary">
                 <span>
@@ -1061,6 +1148,7 @@ export default function Home() {
                 plots={farm.plots}
                 onEdit={(record) => editRecord('harvest', record)}
                 onDelete={(id) => deleteRecord('harvest', id)}
+                canManage={canManageFarm}
               />
             </section>
           )}
@@ -1069,7 +1157,11 @@ export default function Home() {
             <span>
               FIELDNOTE <i /> GROW WITH INTENTION
             </span>
-            <span>Season data stays on this device</span>
+            <span>
+              {process.env.NODE_ENV === 'production'
+                ? 'Shared farm data'
+                : 'Season data stays on this device'}
+            </span>
           </footer>
         </div>
       </main>
@@ -1093,13 +1185,72 @@ export default function Home() {
           onSubmit={saveRecord}
         />
       )}
-      {assistantOpen && (
+      {ownerLoginOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setOwnerLoginOpen(false);
+        }}>
+          <section
+            className="modal-panel owner-login-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="owner-login-title"
+          >
+            <div className="modal-heading">
+              <span className="modal-icon"><LockKeyhole size={18} /></span>
+              <button
+                type="button"
+                className="icon-button modal-close"
+                aria-label="Close owner login"
+                onClick={() => setOwnerLoginOpen(false)}
+              >
+                <X size={18} />
+              </button>
+              <span className="section-kicker">PRIVATE ACCESS</span>
+              <h2 id="owner-login-title">Owner login</h2>
+              <p>Only the farm owner can change records.</p>
+            </div>
+            <form className="modal-form" onSubmit={loginOwner}>
+              <label>
+                Owner password
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={ownerPassword}
+                  onChange={(event) => setOwnerPassword(event.target.value)}
+                  required
+                  autoFocus
+                />
+              </label>
+              {ownerAuthError && (
+                <p className="form-error" role="alert">{ownerAuthError}</p>
+              )}
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setOwnerLoginOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={ownerSubmitting}
+                >
+                  {ownerSubmitting ? 'Signing in…' : 'Sign in'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+      {canManageFarm && assistantOpen && (
         <section className="assistant-panel" aria-label="Fieldnote AI-assistent">
           <header className="assistant-header">
             <span className="assistant-avatar"><Bot size={18} /></span>
             <span>
               <strong>Fieldnote assistent</strong>
-              <small>Lokaal verbonden met Ollama</small>
+              <small>Online teeltassistent</small>
             </span>
             <button
               type="button"
@@ -1172,10 +1323,10 @@ export default function Home() {
               <Send size={16} />
             </button>
           </form>
-          <p className="assistant-privacy">Je farmgegevens blijven lokaal.</p>
+          <p className="assistant-privacy">Relevante farmgegevens worden met Gemini gedeeld.</p>
         </section>
       )}
-      <button
+      {canManageFarm && <button
         type="button"
         className={`assistant-launcher${assistantOpen ? ' open' : ''}`}
         aria-label={assistantOpen ? 'Sluit assistent' : 'Open AI-assistent'}
@@ -1183,7 +1334,7 @@ export default function Home() {
         onClick={() => setAssistantOpen((open) => !open)}
       >
         {assistantOpen ? <X size={20} /> : <Bot size={21} />}
-      </button>
+      </button>}
     </div>
   );
 }
@@ -1370,12 +1521,14 @@ function HarvestTable({
   plots,
   onEdit,
   onDelete,
+  canManage,
 }: {
   harvests: Harvest[];
   plantings: Planting[];
   plots: Plot[];
   onEdit: (harvest: Harvest) => void;
   onDelete: (id: string) => void;
+  canManage: boolean;
 }) {
   return (
     <div className="harvest-table">
@@ -1385,7 +1538,7 @@ function HarvestTable({
         <span>Harvest date</span>
         <span>Yield</span>
         <span>Notes</span>
-        <span>Actions</span>
+        {canManage && <span>Actions</span>}
       </div>
       {harvests.map((harvest) => {
         const planting = plantings.find(
@@ -1408,11 +1561,11 @@ function HarvestTable({
               {harvest.quantity} {harvest.unit}
             </strong>
             <span className="harvest-notes">{harvest.notes || '—'}</span>
-            <RecordActions
+            {canManage && <RecordActions
               label={`${harvest.crop} harvest`}
               onEdit={() => onEdit(harvest)}
               onDelete={() => onDelete(harvest.id)}
-            />
+            />}
           </div>
         );
       })}

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { requireOwner } from '@/lib/api-auth';
 import { createId, readFarmData, writeFarmData } from '@/lib/farm-store';
 
 export async function POST(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const area = Number(body?.area);
@@ -14,7 +17,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const plot = {
     id: createId('plot'),
     name,
@@ -23,11 +26,13 @@ export async function POST(request: Request) {
     state: 'resting' as const,
   };
   data.plots.push(plot);
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(plot, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
@@ -41,20 +46,22 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const plot = data.plots.find((item) => item.id === id);
   if (!plot) {
     return NextResponse.json({ error: 'Plot not found.' }, { status: 404 });
   }
   Object.assign(plot, { name, area, soil });
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(plot);
 }
 
 export async function DELETE(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
-  const data = readFarmData();
+  const data = await readFarmData();
   const plotIndex = data.plots.findIndex((item) => item.id === id);
   if (plotIndex < 0) {
     return NextResponse.json({ error: 'Plot not found.' }, { status: 404 });
@@ -66,6 +73,6 @@ export async function DELETE(request: Request) {
     );
   }
   data.plots.splice(plotIndex, 1);
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json({ success: true });
 }

@@ -269,6 +269,26 @@ button:disabled {
 .topbar-actions {
   gap: 14px;
 }
+.owner-access-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: #49654e;
+  border: 1px solid #dce5da;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 10px;
+}
+.owner-access-button:hover {
+  background: #f1f5ef;
+}
+.owner-state {
+  color: #6e7b71;
+  font-size: 9px;
+}
 .search-control,
 .notification-wrap {
   position: relative;
@@ -1343,6 +1363,9 @@ h1 {
   box-shadow: 0 18px 60px rgba(20, 35, 24, 0.2);
   animation: rise-in 0.2s ease both;
 }
+.owner-login-panel {
+  width: min(400px, 100%);
+}
 .modal-heading {
   position: relative;
   padding: 0 0 17px 48px;
@@ -1811,6 +1834,16 @@ h1 {
   }
   .topbar-actions {
     gap: 8px;
+  }
+  .owner-access-button {
+    width: 32px;
+    min-height: 32px;
+    justify-content: center;
+    padding: 0;
+  }
+  .owner-access-button span,
+  .owner-state {
+    display: none;
   }
   .search-box {
     width: 34px;

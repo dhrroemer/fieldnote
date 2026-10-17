@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireOwner } from '@/lib/api-auth';
 import {
   createId,
   isValidDateString,
@@ -7,6 +8,8 @@ import {
 } from '@/lib/farm-store';
 
 export async function POST(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const plantingId =
     typeof body?.plantingId === 'string' ? body.plantingId : '';
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const planting = data.plantings.find((item) => item.id === plantingId);
   if (!planting) {
     return NextResponse.json(
@@ -60,11 +63,13 @@ export async function POST(request: Request) {
   planting.status = 'harvested';
   const plot = data.plots.find((item) => item.id === planting.plotId);
   if (plot) plot.state = 'resting';
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(harvest, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
   const quantity = Number(body?.quantity);
@@ -86,20 +91,22 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const harvest = data.harvests.find((item) => item.id === id);
   if (!harvest) {
     return NextResponse.json({ error: 'Harvest not found.' }, { status: 404 });
   }
   Object.assign(harvest, { quantity, unit, harvestedOn, notes });
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(harvest);
 }
 
 export async function DELETE(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
-  const data = readFarmData();
+  const data = await readFarmData();
   const harvestIndex = data.harvests.findIndex((item) => item.id === id);
   if (harvestIndex < 0) {
     return NextResponse.json({ error: 'Harvest not found.' }, { status: 404 });
@@ -117,6 +124,6 @@ export async function DELETE(request: Request) {
       if (plot) plot.state = 'active';
     }
   }
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json({ success: true });
 }

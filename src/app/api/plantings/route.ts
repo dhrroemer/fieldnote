@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireOwner } from '@/lib/api-auth';
 import {
   createId,
   isValidDateString,
@@ -7,6 +8,8 @@ import {
 } from '@/lib/farm-store';
 
 export async function POST(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const plotId = typeof body?.plotId === 'string' ? body.plotId : '';
   const crop = typeof body?.crop === 'string' ? body.crop.trim() : '';
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const plot = data.plots.find((item) => item.id === plotId);
   if (!plot) {
     return NextResponse.json(
@@ -63,11 +66,13 @@ export async function POST(request: Request) {
   };
   plot.state = 'active';
   data.plantings.push(planting);
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(planting, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
   const plotId = typeof body?.plotId === 'string' ? body.plotId : '';
@@ -92,7 +97,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const data = readFarmData();
+  const data = await readFarmData();
   const planting = data.plantings.find((item) => item.id === id);
   const plot = data.plots.find((item) => item.id === plotId);
   if (!planting) {
@@ -126,14 +131,16 @@ export async function PATCH(request: Request) {
       : 'resting';
   }
   plot.state = 'active';
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json(planting);
 }
 
 export async function DELETE(request: Request) {
+  const denied = requireOwner(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id : '';
-  const data = readFarmData();
+  const data = await readFarmData();
   const planting = data.plantings.find((item) => item.id === id);
   if (!planting) {
     return NextResponse.json({ error: 'Planting not found.' }, { status: 404 });
@@ -153,6 +160,6 @@ export async function DELETE(request: Request) {
       ? 'active'
       : 'resting';
   }
-  writeFarmData(data);
+  await writeFarmData(data);
   return NextResponse.json({ success: true });
 }

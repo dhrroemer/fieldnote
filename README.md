@@ -11,16 +11,20 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The first request seeds `data/farm-data.json`; subsequent changes are saved to that file and survive server restarts.
 
-## AI assistant
+## Deploy
 
-The assistant uses a local Ollama server. Install Ollama, pull a chat model, and start Ollama before asking the assistant a question:
+The app can be deployed to Vercel with Neon PostgreSQL and Gemini:
 
-```bash
-ollama pull qwen2.5:1.5b
-npm run dev
-```
+1. Import `dhrroemer/fieldnote` into Vercel.
+2. Create a Neon database and add its connection string as `DATABASE_URL` in Vercel.
+3. Add `OWNER_PASSWORD`, `SESSION_SECRET`, and `GEMINI_API_KEY` as encrypted Vercel environment variables. Optionally set `GEMINI_MODEL`.
+4. Deploy. Public visitors can view records; editing requires the owner password.
 
-The default model is `qwen2.5:1.5b`. Set `OLLAMA_MODEL` to use another installed model, or `OLLAMA_BASE_URL` if Ollama is not listening at `http://127.0.0.1:11434`. The app sends relevant plot, active planting, and recent harvest data only when a question is submitted. Chat history stays in the browser and is not written to the farm data file.
+Generate `SESSION_SECRET` locally with a password generator or a cryptographically secure random generator. Never commit real values or share them in chat.
+
+For local development, records remain in `data/farm-data.json` and editing is enabled without owner secrets. To copy that file into an empty Neon database, put `DATABASE_URL` in an ignored `.env.local` file and run `npm run migrate:data`. The migration refuses to overwrite existing cloud data unless `--overwrite` is passed directly to the script.
+
+The AI assistant sends relevant plot, active planting, and recent harvest data to Gemini only when a question is submitted. Chat history stays in the browser. Set `GEMINI_API_KEY` to enable online answers. Ollama can still be used for local-only experimentation by changing the assistant route.
 
 ## API
 
